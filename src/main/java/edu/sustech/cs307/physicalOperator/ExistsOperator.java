@@ -80,7 +80,7 @@ public class ExistsOperator implements PhysicalOperator {
         return r;
     }
 
-    @Override public void Next() { resultTuple = null; }
+    @Override public void Next() { /* hasNext() already found and stored the match; no-op */ }
     @Override public Tuple Current() { return resultTuple; }
     @Override public void Close() { outerChild.Close(); subScan.Close(); isOpen = false; }
 

@@ -156,27 +156,25 @@ public class DiskManager {
     public void CreateFile(String filename) throws DBException {
         String real_path = currentDir + "/" + filename;
         File file = new File(real_path);
-        if (!file.exists()) {
-            try {
-                // 如果上级目录不存在则创建
-                File parent = file.getParentFile();
-                if (parent != null && !parent.exists()) {
-                    parent.mkdirs();
-                }
-                if (!file.createNewFile()) {
-                    throw new DBException(ExceptionTypes.BadIOError("File creation failed: " + real_path));
-                }
-                this.filePages.put(filename, 1);
-            } catch (IOException e) {
-                throw new DBException(ExceptionTypes.BadIOError(e.getMessage()));
+        // 如果文件已存在（上次删除不彻底的残留），先删除再重建，确保干净状态
+        if (file.exists()) {
+            if (!file.delete()) {
+                throw new DBException(ExceptionTypes.BadIOError("Failed to delete stale file: " + real_path));
             }
-        } else {
-            // 文件已存在（例如之前运行残留），确保它在 filePages 中注册
-            if (!this.filePages.containsKey(filename)) {
-                // 根据已有文件大小计算页面数
-                int numPages = (int) (file.length() / Page.DEFAULT_PAGE_SIZE);
-                this.filePages.put(filename, Math.max(numPages, 1));
+            this.filePages.remove(filename);
+        }
+        try {
+            // 如果上级目录不存在则创建
+            File parent = file.getParentFile();
+            if (parent != null && !parent.exists()) {
+                parent.mkdirs();
             }
+            if (!file.createNewFile()) {
+                throw new DBException(ExceptionTypes.BadIOError("File creation failed: " + real_path));
+            }
+            this.filePages.put(filename, 1);
+        } catch (IOException e) {
+            throw new DBException(ExceptionTypes.BadIOError(e.getMessage()));
         }
     }
 
@@ -206,7 +204,9 @@ public class DiskManager {
             if (!file.delete()) {
                 throw new DBException(ExceptionTypes.BadIOError("File deletion failed: " + real_path));
             }
-            this.filePages.remove(filename);
         }
+        this.filePages.remove(filename);
+        // 立即持久化 disk_manager_meta，防止崩溃后残留
+        dump_disk_manager_meta(this);
     }
 }

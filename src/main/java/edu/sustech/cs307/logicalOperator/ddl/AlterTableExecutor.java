@@ -30,6 +30,9 @@ public class AlterTableExecutor implements DMLExecutor {
         }
 
         for (AlterExpression exp : alterExps) {
+            if (exp.getOperation() == null) {
+                throw new DBException(ExceptionTypes.UnsupportedCommand("ALTER TABLE with null operation"));
+            }
             String opType = exp.getOperation().name().toUpperCase();
             switch (opType) {
                 case "ADD" -> {
@@ -40,7 +43,9 @@ public class AlterTableExecutor implements DMLExecutor {
                     if (dtList != null && !dtList.isEmpty()) {
                         colType = dtList.get(0).toString();
                     }
-                    ValueType vt = switch (colType.toLowerCase()) {
+                    // 处理带参数的类型，如 varchar(20), char(100), int(11) 等
+                    String colTypeLower = colType.toLowerCase().replaceAll("\\(.*\\)", "").trim();
+                    ValueType vt = switch (colTypeLower) {
                         case "int" -> ValueType.INTEGER;
                         case "char", "varchar" -> ValueType.CHAR;
                         case "float", "double" -> ValueType.FLOAT;

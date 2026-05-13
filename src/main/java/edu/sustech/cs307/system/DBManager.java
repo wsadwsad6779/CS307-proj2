@@ -147,17 +147,20 @@ public class DBManager {
         // 1. 刷新缓冲池中该表的所有页面到磁盘
         bufferPool.FlushAllPages(data_file);
 
-        // 2. 从磁盘管理器中删除数据文件（同时从 filePages 移除）
+        // 2. 从缓冲池中彻底移除该文件的所有页面缓存（防止残留）
+        bufferPool.removePagesByFilename(data_file);
+
+        // 3. 从磁盘管理器中删除数据文件（同时从 filePages 移除并持久化）
         diskManager.DeleteFile(data_file);
 
-        // 3. 删除表目录
+        // 4. 删除表目录（包括可能残留的任何文件）
         String table_folder = String.format("%s/%s", diskManager.getCurrentDir(), table_name);
         File file_folder = new File(table_folder);
         if (file_folder.exists()) {
             deleteDirectory(file_folder);
         }
 
-        // 4. 删除元数据
+        // 5. 删除元数据并持久化
         metaManager.dropTable(table_name);
 
         Logger.info("Table '{}' dropped successfully.", table_name);

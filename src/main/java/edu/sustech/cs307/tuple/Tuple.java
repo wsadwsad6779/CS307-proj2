@@ -36,6 +36,10 @@ public abstract class Tuple {
             return evaluateBinaryExpression(tuple, binaryExpression);
         } else if (whereExpr instanceof InExpression inExpr) {
             return evaluateInExpression(tuple, inExpr);
+        } else if (whereExpr instanceof net.sf.jsqlparser.expression.Parenthesis paren) {
+            return evaluateCondition(tuple, paren.getExpression());
+        } else if (whereExpr instanceof net.sf.jsqlparser.expression.NotExpression notExpr) {
+            return !evaluateCondition(tuple, notExpr.getExpression());
         } else {
             return true;
         }

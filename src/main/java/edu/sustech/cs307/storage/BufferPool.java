@@ -215,6 +215,34 @@ public class BufferPool {
     }
 
     /**
+     * 从缓冲池中安全移除指定文件的所有页面缓存。
+     * 只清理 pageMap 映射关系并归还 frame 到 freeList，不修改 pages 列表（避免索引错乱）。
+     * 被释放的 frame 在后续 FetchPage 时会被自然覆盖。
+     *
+     * @param filename 要移除缓存的文件名
+     */
+    public void removePagesByFilename(String filename) {
+        List<PagePosition> toRemove = new ArrayList<>();
+        for (Map.Entry<PagePosition, Integer> entry : this.pageMap.entrySet()) {
+            if (entry.getKey().filename.equals(filename)) {
+                toRemove.add(entry.getKey());
+            }
+        }
+        for (PagePosition pos : toRemove) {
+            Integer frameId = this.pageMap.remove(pos);
+            if (frameId != null) {
+                // 重置该 frame 的 page 对象以备复用
+                Page page = pages.get(frameId);
+                page.pin_count = 0;
+                page.dirty = false;
+                Arrays.fill(page.data.array(), (byte) 0);
+                page.position = null;
+                freeList.add(frameId);
+            }
+        }
+    }
+
+    /**
      * 删除指定文件名的所有页面。
      *
      * @param filename 要删除页面的文件名
