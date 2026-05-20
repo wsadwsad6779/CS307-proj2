@@ -37,13 +37,26 @@ public class AlterTableExecutor implements DMLExecutor {
             switch (opType) {
                 case "ADD" -> {
                     String colName = exp.getColumnName();
-                    // 从 AlterExpression 的 SQL 文本中解析列类型
-                    String colType = "char";
+                    // 从 AlterExpression 中解析列类型
+                    // JSqlParser 有时会把 "列名 类型" 一起放进 colDataTypeList
+                    String colType = null;
                     var dtList = exp.getColDataTypeList();
                     if (dtList != null && !dtList.isEmpty()) {
                         colType = dtList.get(0).toString();
                     }
-                    // 处理带参数的类型，如 varchar(20), char(100), int(11) 等
+                    // 如果 colType 包含空格（如 "email varchar"），取最后一个空格后的词作为类型
+                    if (colType != null && colType.contains(" ")) {
+                        String[] parts = colType.split("\\s+");
+                        colType = parts[parts.length - 1];
+                        // 如果 colName 为空或与类型混在一起，从第一部分提取列名
+                        if (colName == null || colName.isEmpty() || parts.length > 1) {
+                            colName = parts[0];
+                        }
+                    }
+                    if (colType == null || colType.isEmpty()) {
+                        colType = "char";
+                    }
+                    // 处理带参数的类型，如 varchar(20), char(100) 等
                     String colTypeLower = colType.toLowerCase().replaceAll("\\(.*\\)", "").trim();
                     ValueType vt = switch (colTypeLower) {
                         case "int" -> ValueType.INTEGER;
@@ -51,6 +64,9 @@ public class AlterTableExecutor implements DMLExecutor {
                         case "float", "double" -> ValueType.FLOAT;
                         default -> throw new DBException(ExceptionTypes.UnsupportedCommand("ALTER TABLE ADD " + colType));
                     };
+                    if (colName == null || colName.isEmpty()) {
+                        throw new DBException(ExceptionTypes.InvalidSQL("ALTER TABLE ADD", "No column name specified"));
+                    }
                     int newColSize = vt == ValueType.CHAR ? Value.CHAR_SIZE :
                                      vt == ValueType.INTEGER ? Value.INT_SIZE : Value.FLOAT_SIZE;
                     var tableMeta = dbManager.getMetaManager().getTable(tableName);

@@ -259,10 +259,16 @@ public class LogicalPlanner {
     private static LogicalOperator handleExists(DBManager dbManager, LogicalOperator outer,
                                                  ExistsExpression existsExpr) throws DBException {
         var right = existsExpr.getRightExpression();
+        // JSqlParser 将 EXISTS (SELECT ...) 解析为 Parenthesis(PlainSelect)
+        // 需要先解包 Parenthesis 层，才能取到 PlainSelect
+        while (right instanceof net.sf.jsqlparser.expression.Parenthesis paren) {
+            right = paren.getExpression();
+        }
         if (right instanceof net.sf.jsqlparser.statement.select.PlainSelect subPlain) {
             LogicalOperator subPlan = buildSubQueryPlan(dbManager, subPlain);
             return new LogicalExistsOperator(outer, subPlan, existsExpr.isNot(), subPlain.getWhere());
         }
+        // 其他复杂子查询（如 SetOperationList 等）暂不处理，回退为全表过滤
         return new LogicalFilterOperator(outer, existsExpr);
     }
 
