@@ -76,6 +76,7 @@ public class AlterTableExecutor implements DMLExecutor {
                         if (end > maxOffset) maxOffset = end;
                     }
                     ColumnMeta newCol = new ColumnMeta(tableName, colName, vt, newColSize, maxOffset);
+                    newCol.displayType = colTypeLower;
                     dbManager.addColumn(tableName, newCol);
                     Logger.info("Column '{}' added to table '{}'.", colName, tableName);
                 }

@@ -44,13 +44,19 @@ public class CreateTableExecutor implements DMLExecutor {
             ColDataType colType = col.getColDataType();
             String dataType = colType.getDataType().toLowerCase();
             if (dataType.equals("char") || dataType.equals("varchar")) {
-                colMapping.add(new ColumnMeta(table, colName, ValueType.CHAR, Value.CHAR_SIZE, offset));
+                ColumnMeta colMeta = new ColumnMeta(table, colName, ValueType.CHAR, Value.CHAR_SIZE, offset);
+                colMeta.displayType = dataType;
+                colMapping.add(colMeta);
                 offset += Value.CHAR_SIZE;
             } else if (dataType.equals("int")) {
-                colMapping.add(new ColumnMeta(table, colName, ValueType.INTEGER, Value.INT_SIZE, offset));
+                ColumnMeta colMeta = new ColumnMeta(table, colName, ValueType.INTEGER, Value.INT_SIZE, offset);
+                colMeta.displayType = dataType;
+                colMapping.add(colMeta);
                 offset += Value.INT_SIZE;
             } else if (dataType.equals("float") || dataType.equals("double")) {
-                colMapping.add(new ColumnMeta(table, colName, ValueType.FLOAT, Value.FLOAT_SIZE, offset));
+                ColumnMeta colMeta = new ColumnMeta(table, colName, ValueType.FLOAT, Value.FLOAT_SIZE, offset);
+                colMeta.displayType = dataType;
+                colMapping.add(colMeta);
                 offset += Value.FLOAT_SIZE;
             } else {
                 throw new DBException(ExceptionTypes.UnsupportedCommand(String.format("CREATE TABLE %s", table)));

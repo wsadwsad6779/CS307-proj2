@@ -39,15 +39,11 @@ public class ProjectOperator implements PhysicalOperator {
 
     @Override
     public void Next() throws DBException {
-        if (hasNext()) {
-            child.Next();
-            Tuple inputTuple = child.Current();
-            if (inputTuple != null) {
-
-                currentTuple = new ProjectTuple(inputTuple, outputSchema); // Create ProjectTuple
-            } else {
-                currentTuple = null;
-            }
+        // hasNext() has already been evaluated by the caller; do not call it again here
+        child.Next();
+        Tuple inputTuple = child.Current();
+        if (inputTuple != null) {
+            currentTuple = new ProjectTuple(inputTuple, outputSchema);
         } else {
             currentTuple = null;
         }

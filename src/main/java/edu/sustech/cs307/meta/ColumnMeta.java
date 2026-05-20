@@ -13,6 +13,9 @@ public class ColumnMeta {
     @JsonProperty("type")
     public ValueType type;
 
+    @JsonProperty("displayType")
+    public String displayType;
+
     @JsonProperty("len")
     public int len;
 
@@ -28,12 +31,31 @@ public class ColumnMeta {
                       @JsonProperty("name") String name,
                       @JsonProperty("type") ValueType type,
                       @JsonProperty("len") int len,
-                      @JsonProperty("offset") int offset) {
+                      @JsonProperty("offset") int offset,
+                      @JsonProperty("displayType") String displayType) {
         this.tableName = tableName;
         this.name = name;
         this.type = type;
         this.len = len;
         this.offset = offset;
+        if (displayType != null && !displayType.isBlank()) {
+            this.displayType = displayType;
+        } else {
+            this.displayType = normalizeDisplayType(type);
+        }
+    }
+
+    private static String normalizeDisplayType(ValueType type) {
+        if (type == null) return "unknown";
+        return switch (type) {
+            case CHAR -> "varchar";
+            case FLOAT -> "double";
+            default -> type.toString();
+        };
+    }
+
+    public ColumnMeta(String tableName, String name, ValueType type, int len, int offset) {
+        this(tableName, name, type, len, offset, null);
     }
 
     public int getLen() {

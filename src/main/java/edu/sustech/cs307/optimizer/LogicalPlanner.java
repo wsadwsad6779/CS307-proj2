@@ -129,10 +129,16 @@ public class LogicalPlanner {
 
         // 在 Join 之后应用 Filter 或 EXISTS
         if (plainSelect.getWhere() != null) {
-            if (plainSelect.getWhere() instanceof ExistsExpression existsExpr) {
+            var whereExpr = plainSelect.getWhere();
+            var unwrapped = unwrapParenthesis(whereExpr);
+            if (unwrapped instanceof net.sf.jsqlparser.expression.NotExpression notExpr
+                    && notExpr.getExpression() instanceof ExistsExpression existsExpr) {
+                existsExpr.setNot(true);
+                root = handleExists(dbManager, root, existsExpr);
+            } else if (unwrapped instanceof ExistsExpression existsExpr) {
                 root = handleExists(dbManager, root, existsExpr);
             } else {
-                root = new LogicalFilterOperator(root, plainSelect.getWhere());
+                root = new LogicalFilterOperator(root, whereExpr);
             }
         }
 
@@ -264,6 +270,13 @@ public class LogicalPlanner {
         while (right instanceof net.sf.jsqlparser.expression.Parenthesis paren) {
             right = paren.getExpression();
         }
+        if (right instanceof net.sf.jsqlparser.statement.select.Select selectExpr) {
+            var subPlain = selectExpr.getPlainSelect();
+            if (subPlain != null) {
+                LogicalOperator subPlan = buildSubQueryPlan(dbManager, subPlain);
+                return new LogicalExistsOperator(outer, subPlan, existsExpr.isNot(), subPlain.getWhere());
+            }
+        }
         if (right instanceof net.sf.jsqlparser.statement.select.PlainSelect subPlain) {
             LogicalOperator subPlan = buildSubQueryPlan(dbManager, subPlain);
             return new LogicalExistsOperator(outer, subPlan, existsExpr.isNot(), subPlain.getWhere());
@@ -296,6 +309,14 @@ public class LogicalPlanner {
             return true;
         }
         return false;
+    }
+
+    private static net.sf.jsqlparser.expression.Expression unwrapParenthesis(
+            net.sf.jsqlparser.expression.Expression expr) {
+        while (expr instanceof net.sf.jsqlparser.expression.Parenthesis paren) {
+            expr = paren.getExpression();
+        }
+        return expr;
     }
 
     private static String normalizeSql(String sql) {

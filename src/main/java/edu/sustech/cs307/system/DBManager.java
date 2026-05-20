@@ -95,7 +95,9 @@ public class DBManager {
         Logger.info("|    Field   |   Type     |");
         Logger.info("|-------------------------|");
         for (ColumnMeta col : meta.columns_list) {
-            String typeStr = col.type.toString().toLowerCase();
+            String typeStr = (col.displayType != null && !col.displayType.isBlank())
+                    ? col.displayType.toLowerCase()
+                    : col.type.toString().toLowerCase();
             Logger.info("| " + StringUtils.center(col.name, 10) + " | " + StringUtils.center(typeStr, 10) + " |");
         }
         Logger.info("|-------------------------|");

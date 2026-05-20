@@ -40,9 +40,12 @@ public class TableTuple extends Tuple {
         }
         int offset = columnMeta.getOffset();
         int len = columnMeta.getLen();
-        // Use GetColumnValue to get the value based on offset and len
-        ByteBuf columnValueBuf = record.GetColumnValue(offset, len); // Use the record passed to getValue
-        // Convert ByteBuf to Value (assuming you have a method for this)
+        // 旧记录可能比新 schema 短（ALTER ADD COLUMN 后），超出范围则返回 null
+        ByteBuf raw = record.getReadOnlyData();
+        if (raw == null || offset + len > raw.capacity()) {
+            return null;
+        }
+        ByteBuf columnValueBuf = raw.slice(offset, len);
         return convertByteBufToValue(columnValueBuf, columnMeta.type);
     }
 
