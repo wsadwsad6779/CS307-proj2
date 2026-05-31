@@ -27,6 +27,7 @@ public class TableMeta {
 
     public TableMeta(String tableName) {
         this.tableName = tableName;
+        this.columns_list = new ArrayList<>();
         this.columns = new HashMap<>();
         this.indexes = new HashMap<>();
     }
@@ -44,10 +45,10 @@ public class TableMeta {
     @JsonCreator
     public TableMeta(@JsonProperty("tableName") String tableName, @JsonProperty("columns_list") ArrayList<ColumnMeta> columns_list, @JsonProperty("indexes")  Map<String, IndexType> indexes) {
         this.tableName = tableName;
-        this.columns_list = columns_list;
+        this.columns_list = columns_list == null ? new ArrayList<>() : columns_list;
         this.columns = new HashMap<>();
-        this.indexes = indexes;
-        for (var column : columns_list) {
+        this.indexes = indexes == null ? new HashMap<>() : indexes;
+        for (var column : this.columns_list) {
             this.columns.put(column.name, column);
         }
     }

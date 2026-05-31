@@ -53,7 +53,13 @@ public class TableTuple extends Tuple {
         if (columnType == ValueType.INTEGER) {
             return new Value(byteBuf.getLong(0));
         } else if (columnType == ValueType.CHAR) {
-            return new Value(byteBuf.getCharSequence(0, 64, java.nio.charset.StandardCharsets.UTF_8).toString());
+            byte[] raw = new byte[byteBuf.capacity()];
+            byteBuf.getBytes(0, raw);
+            int len = 0;
+            while (len < raw.length && raw[len] != 0) {
+                len++;
+            }
+            return new Value(new String(raw, 0, len, java.nio.charset.StandardCharsets.UTF_8));
         } else if (columnType == ValueType.FLOAT) {
             return new Value(byteBuf.getDouble(0));
         } else {

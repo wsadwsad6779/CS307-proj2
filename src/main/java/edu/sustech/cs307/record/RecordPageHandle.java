@@ -20,10 +20,11 @@ public class RecordPageHandle {
     public RecordPageHandle(RecordFileHeader fileHdr, Page page) {
         this.fileHdr = fileHdr;
         this.page = page;
-        this.pageHdr = new RecordPageHeader(page.data.slice(0, RecordPageHeader.SIZE));
-        this.bitmap = page.data.slice(RecordPageHeader.SIZE, fileHdr.getBitMapSize());
-        this.slots = page.data.slice(RecordPageHeader.SIZE + fileHdr.getBitMapSize(),
-                Page.DEFAULT_PAGE_SIZE - (RecordPageHeader.SIZE + fileHdr.getBitMapSize()));
+        int baseOffset = page.getPageID() == 0 ? RecordFileHeader.SIZE : 0;
+        this.pageHdr = new RecordPageHeader(page.data.slice(baseOffset, RecordPageHeader.SIZE));
+        this.bitmap = page.data.slice(baseOffset + RecordPageHeader.SIZE, fileHdr.getBitMapSize());
+        this.slots = page.data.slice(baseOffset + RecordPageHeader.SIZE + fileHdr.getBitMapSize(),
+            Page.DEFAULT_PAGE_SIZE - (baseOffset + RecordPageHeader.SIZE + fileHdr.getBitMapSize()));
     }
 
     public ByteBuf getSlot(int slotNo) {

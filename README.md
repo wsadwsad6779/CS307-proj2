@@ -1,7 +1,7 @@
 注意：
 1.该项目基于Maven工程搭建，建议用Intellij IDEA打开
 
-2.如果复制多行，多按一次换行，有时候最新一条代码的结果需要多按一下才能刷新出来。
+2.如果复制多行，多按一两次换行，有时候最新一条代码的结果需要多按一下才能刷新出来。
 
 3.每条指令必须在同一行
 
@@ -131,13 +131,7 @@ insert into t (id, name, age, gpa) values (36, 'john', 21, 3.01);
 
 ### 预期输出
 
-每条 insert 都应该成功：
-
-```text
-OK: 1 row inserted
-```
-
-总共应成功插入 36 行。
+每条 insert 都应该成功，总共应成功插入 36 行。
 
 
 # 四、基础 SELECT 与 SeqScan 检查
@@ -409,8 +403,6 @@ id | name   | age
 ---
 
 ## 3. AND + OR 混合条件
-
-如果支持括号，必须测试这个。
 
 ### 输入
 
@@ -852,9 +844,7 @@ ERROR: table t does not exist
 
 # 十五、进阶功能检查 SQL
 
-下面是进阶部分。如果你们没有实现，可以跳过。
-
-建议在执行 DELETE 和 DROP TABLE 之前跑这些进阶测试。也就是说，最好在原始 36 条数据还完整时跑。
+在执行 DELETE 和 DROP TABLE 之前跑这些进阶测试。
 
 ---
 
@@ -917,8 +907,6 @@ age | count
 26  | 1
 ```
 
-顺序可以不同，但每个 age 对应的 count 必须正确。
-
 ---
 
 # B. ORDER BY
@@ -937,10 +925,10 @@ select id, name, age from t order by age;
 
 ```text
 id | name   | age
-1  | apple  | 18
+1  | alice  | 18
 3  | cathy  | 18
 9  | ivy    | 18
-16 | low_gpa_young | 18
+16 | peter | 18
 23 | wendy  | 18
 30 | daniel | 18
 ......
@@ -951,9 +939,6 @@ id | name   | age
 ```text
 31 | eric | 26
 ```
-
-如果你们在 update 前跑这个测试，那么 id = 1 应该是 `alice`，id = 16 应该是 `peter`。
-。
 
 ---
 
@@ -1016,7 +1001,7 @@ select t.id, t.name, course.course_name, course.score from t join course on t.id
 
 ```text
 t.id | t.name  | course.course_name | course.score
-1    | apple   | db                 | 95.0
+1    | alice   | db                 | 95.0
 2    | bob     | db                 | 88.0
 3    | cathy   | ai                 | 91.0
 7    | grace   | db                 | 99.0
@@ -1053,20 +1038,18 @@ age = 19 的 5 行
 具体：
 
 ```text
-1  | apple  | 18
+1  | alice  | 18
 2  | bob    | 19
 3  | cathy  | 18
 7  | grace  | 19
 9  | ivy    | 18
 12 | leo    | 19
-16 | low_gpa_young | 18
+16 | peter | 18
 21 | uma    | 19
 23 | wendy  | 18
 29 | clara  | 19
 30 | daniel | 18
 ```
-
-如果你们在 update 前运行，则 `apple` 应为 `alice`，`low_gpa_young` 应为 `peter`。
 
 ---
 
@@ -1099,8 +1082,6 @@ select id, name, age from t where age not in (18, 19, 20, 21, 22);
 
 ## 3. EXISTS
 
-如果支持相关子查询：
-
 ### 输入
 
 ```sql
@@ -1111,7 +1092,7 @@ select id, name from t where exists (  select * from course where course.student
 
 ```text
 id | name
-1  | apple
+1  | alice
 2  | bob
 3  | cathy
 7  | grace
@@ -1122,13 +1103,9 @@ id | name
 26 | zoe
 ```
 
-如果在 update 前运行，`apple` 应为 `alice`。
-
 ---
 
 # E. ALTER TABLE
-
-如果你们实现了部分 ALTER TABLE，可以测试：
 
 ### 输入
 
@@ -1152,7 +1129,7 @@ gpa   | double
 email | varchar
 ```
 
-然后测试旧数据：
+测试旧数据：
 
 ```sql
 select id, name, email from t where id = 1;
@@ -1164,15 +1141,6 @@ select id, name, email from t where id = 1;
 id | name  | email
 1  | apple | null
 ```
-
-或者：
-
-```text
-1 | apple | 
-```
-
-只要你们设计中明确旧数据新增字段的默认值即可。
-
 
 ---
 

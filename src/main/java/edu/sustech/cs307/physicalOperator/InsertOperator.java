@@ -40,10 +40,26 @@ public class InsertOperator implements PhysicalOperator {
     public void Begin() throws DBException {
         try {
             var fileHandle = dbManager.getRecordManager().OpenFile(data_file);
+            var tableMeta = dbManager.getMetaManager().getTable(data_file);
+            int[] colSizes = new int[columnSize];
+            for (int i = 0; i < columnSize; i++) {
+                String colName = tableMeta.columns_list.get(i).name;
+                colSizes[i] = tableMeta.getColumnMeta(colName).len;
+            }
             // Serialize values to ByteBuf
             ByteBuf buffer = Unpooled.buffer();
             for (int i = 0; i < values.size(); i++) {
-                buffer.writeBytes(values.get(i).ToByte());
+                Value v = values.get(i);
+                int colLen = colSizes[i % columnSize];
+                if (v.type == ValueType.CHAR) {
+                    byte[] raw = v.ToByte();
+                    byte[] padded = new byte[colLen];
+                    int copyLen = Math.min(raw.length, colLen);
+                    System.arraycopy(raw, 0, padded, 0, copyLen);
+                    buffer.writeBytes(padded);
+                } else {
+                    buffer.writeBytes(v.ToByte());
+                }
                 if ((columnSize == 1) || ((i + 1) % columnSize == 0 && i != 0)) {
                     fileHandle.InsertRecord(buffer);
                     buffer.clear();

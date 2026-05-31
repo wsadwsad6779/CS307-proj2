@@ -205,10 +205,19 @@ public class RecordFileHandle {
      */
     private RecordPageHandle create_page_handle() throws DBException {
         if (fileHeader.getFirstFreePage() == RecordPageHeader.NO_NEXT_FREE_PAGE) {
+            // If only header page exists, reuse page 0 as the first data page
+            if (fileHeader.getNumberOfPages() == 1) {
+                RecordPageHandle handle = FetchPageHandle(0);
+                BitMap.init(handle.bitmap);
+                handle.pageHdr.setNumberOfRecords(0);
+                handle.pageHdr.setNextFreePageNo(RecordPageHeader.NO_NEXT_FREE_PAGE);
+                fileHeader.setFirstFreePage(0);
+                fileHeader.setNumberOfPages(2);
+                return handle;
+            }
             return CreateNewPageHandle();
-        } else {
-            return FetchPageHandle(fileHeader.getFirstFreePage());
         }
+        return FetchPageHandle(fileHeader.getFirstFreePage());
     }
 
     /**

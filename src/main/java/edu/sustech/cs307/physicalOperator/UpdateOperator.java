@@ -81,15 +81,20 @@ public class UpdateOperator implements PhysicalOperator {
                     newValues.set(index, newValue);
                 }
                 ByteBuf buffer = Unpooled.buffer();
-                for (Value v : newValues) {
-                    String str = "";
-                    if (v.type == ValueType.CHAR) str = (String) v.value;
-                    if (str.length() == 64) {
-                        ByteBuffer temp = ByteBuffer.allocate(64);
-                        temp.put(str.getBytes());
-                        buffer.writeBytes(temp.array());
+                for (int i = 0; i < newValues.size(); i++) {
+                    Value v = newValues.get(i);
+                    int colLen = schema[i].getColumnName() != null
+                            ? seqScanOperator.outputSchema().get(i).len
+                            : v.ToByte().length;
+                    if (v.type == ValueType.CHAR) {
+                        byte[] raw = v.ToByte();
+                        byte[] padded = new byte[colLen];
+                        int copyLen = Math.min(raw.length, colLen);
+                        System.arraycopy(raw, 0, padded, 0, copyLen);
+                        buffer.writeBytes(padded);
+                    } else {
+                        buffer.writeBytes(v.ToByte());
                     }
-                    else buffer.writeBytes(v.ToByte());
                 }
 
                 fileHandle.UpdateRecord(tuple.getRID(), buffer);

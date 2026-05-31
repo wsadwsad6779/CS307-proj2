@@ -68,9 +68,9 @@ public class SeqScanOperator implements PhysicalOperator {
     public void Begin() throws DBException {
         try {
             fileHandle = dbManager.getRecordManager().OpenFile(tableName);
-            totalPages = fileHandle.getFileHeader().getNumberOfPages();
+            totalPages = fileHandle.getFileHeader().getNumberOfPages() - 2;
             recordsPerPage = fileHandle.getFileHeader().getNumberOfRecordsPrePage();
-            currentPageNum = 1; // Start from first page
+            currentPageNum = 0; // Start from first data page
             currentSlotNum = 0; // Start from first slot
             isOpen = true;
         } catch (DBException e) {
