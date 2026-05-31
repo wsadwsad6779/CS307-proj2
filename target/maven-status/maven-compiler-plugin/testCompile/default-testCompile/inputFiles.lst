@@ -1,0 +1,10 @@
+/home/yun/dbproject2/CS307-proj2/src/test/java/storage/LRUReplacerTest.java
+/home/yun/dbproject2/CS307-proj2/src/test/java/record/RecordFileHandleTest.java
+/home/yun/dbproject2/CS307-proj2/src/test/java/system/TransactionManagerTest.java
+/home/yun/dbproject2/CS307-proj2/src/test/java/storage/ClockReplacerTest.java
+/home/yun/dbproject2/CS307-proj2/src/test/java/meta/MetaManagerTest.java
+/home/yun/dbproject2/CS307-proj2/src/test/java/system/RecordManagerTest.java
+/home/yun/dbproject2/CS307-proj2/src/test/java/storage/DiskManagerTest.java
+/home/yun/dbproject2/CS307-proj2/src/test/java/storage/BufferPoolTest.java
+/home/yun/dbproject2/CS307-proj2/src/test/java/value/ValueComparerTest.java
+/home/yun/dbproject2/CS307-proj2/src/test/java/record/BitMapTest.java

@@ -241,6 +241,26 @@ public class BufferPool {
             }
         }
     }
+    /**
+     * 丢弃缓冲池中【所有】页面缓存（不写回磁盘）。
+     * 用于事务回滚：把磁盘换回快照后，内存里残留的旧页/脏页必须全部作废，
+     * 否则下次 FetchPage 命中的还是旧内容。注意与 FlushAllPages 的区别：
+     * 这里脏页【直接丢弃，绝不写回】。
+     */
+    public void discardAllPages() {
+        List<PagePosition> toRemove = new ArrayList<>(this.pageMap.keySet());
+        for (PagePosition pos : toRemove) {
+            Integer frameId = this.pageMap.remove(pos);
+            if (frameId != null) {
+                Page page = pages.get(frameId);
+                page.pin_count = 0;
+                page.dirty = false;
+                Arrays.fill(page.data.array(), (byte) 0);
+                page.position = null;
+                freeList.add(frameId);
+            }
+        }
+    }
 
     /**
      * 删除指定文件名的所有页面。

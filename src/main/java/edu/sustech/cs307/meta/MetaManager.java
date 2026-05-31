@@ -102,4 +102,8 @@ public class MetaManager {
             throw new DBException(ExceptionTypes.UnableLoadMetadata(e.getMessage()));
         }
     }
+    public void reload() throws DBException{
+        tables.clear();
+        loadFromJson();
+    }
 }

@@ -43,6 +43,12 @@ public class LogicalPlanner {
             Pattern.compile("(?i)^DESCRIBE\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;?\\s*$");
     private static final Pattern SHOW_TABLES_PATTERN =
             Pattern.compile("(?i)^SHOW\\s+TABLES\\s*;?\\s*$");
+    private static final Pattern SAVEPOINT_PATTERN =
+            Pattern.compile("(?i)^SAVEPOINT\\s+([A-Za-z_][A-Za-z0-9_]*)$");
+    private static final Pattern ROLLBACK_TO_PATTERN =
+            Pattern.compile("(?i)^ROLLBACK\\s+TO(?:\\s+SAVEPOINT)?\\s+([A-Za-z_][A-Za-z0-9_]*)$");
+    private static final Pattern ROLLBACK_PATTERN =
+            Pattern.compile("(?i)^ROLLBACK(?:\\s+WORK|\\s+TRANSACTION)?$");
 
     public static LogicalOperator resolveAndPlan(DBManager dbManager, String sql) throws DBException {
         if (sql == null || sql.isBlank()) {
@@ -333,6 +339,30 @@ public class LogicalPlanner {
             dbManager.beginTransaction();
             return true;
         }
+
+        Matcher sp = SAVEPOINT_PATTERN.matcher(normalizedSql);
+        if (sp.matches()) {
+            dbManager.savepoint(sp.group(1));
+            return true;
+        }
+
+        Matcher rbTo = ROLLBACK_TO_PATTERN.matcher(normalizedSql);
+        if (rbTo.matches()) {
+            dbManager.rollbackToSavepoint(rbTo.group(1));
+            return true;
+        }
+
+        Matcher rel = RELEASE_SAVEPOINT_PATTERN.matcher(normalizedSql);
+        if (rel.matches()) {
+            dbManager.releaseSavepoint(rel.group(1));
+            return true;
+        }
+
+        if (ROLLBACK_PATTERN.matcher(normalizedSql).matches()) {
+            dbManager.rollbackTransaction();
+            return true;
+        }
+
         return false;
     }
 

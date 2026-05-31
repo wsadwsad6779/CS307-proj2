@@ -244,4 +244,21 @@ public class DBManager {
         DiskManager.dump_disk_manager_meta(this.diskManager);
         this.metaManager.saveToJson();
     }
+
+    public void rollbackTransaction() throws DBException {
+        transactionManager.rollback();
+    }
+
+    public void savepoint(String name) throws DBException {
+        transactionManager.savepoint(name);
+    }
+
+    public void rollbackToSavepoint(String name) throws
+            DBException {
+        transactionManager.rollbackToSavepoint(name);
+    }
+
+    public void releaseSavepoint(String name) throws DBException {
+        transactionManager.releaseSavepoint(name);
+    }
 }
