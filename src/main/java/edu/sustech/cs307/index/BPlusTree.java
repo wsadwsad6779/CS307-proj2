@@ -98,4 +98,56 @@ public class BPlusTree {
     public void printTree() {
         // TODO
     }
+
+    private SplitResult insertInto(Node node, Value key, RID rid) throws DBException {
+        int index = 0;
+        if (node.isLeaf) {
+            while (index < node.keys.size() && cmp(key, node.keys.get(index)) >= 0) {
+                index++;
+            }
+            node.keys.add(index, key);
+            node.values.add(index, rid);
+            if (node.keys.size() > MAX_KEYS) {
+                return splitLeaf(node);
+            }
+            return null;
+        } else {
+            while (index < node.keys.size() && cmp(key, node.keys.get(index)) >= 0) {
+                index++;
+            }
+            SplitResult r= insertInto(node.children.get(index), key, rid);
+            if(r==null){
+                return null;
+            }
+            node.keys.add(index,r.upKey);
+            node.children.add(index+1,r.rightNode);
+            if(node.keys.size() > MAX_KEYS){
+                return splitInternal(node);
+            }
+            return null;
+        }
+    }
+
+    private SplitResult splitLeaf(Node node) {
+        int mid = node.keys.size() / 2;//4-->2，还是右端
+        Node newNode = new Node(true);
+        newNode.keys.addAll(node.keys.subList(mid, node.keys.size()));
+        newNode.values.addAll(node.values.subList(mid,node.values.size()));
+        node.keys.subList(mid,node.keys.size()).clear();
+        node.values.subList(mid,node.values.size()).clear();
+        Value upKey = newNode.keys.get(0);
+        newNode.next=node.next;
+        node.next=newNode;
+        return new SplitResult(upKey,newNode);
+    }
+    private SplitResult splitInternal(Node node){
+        int mid = node.keys.size() / 2;
+        Value upKey = node.keys.get(mid);
+        Node newNode = new Node(false);
+        newNode.keys.addAll(node.keys.subList(mid+1,node.keys.size()));
+        newNode.children.addAll(node.children.subList(mid+1,node.children.size()));
+        node.keys.subList(mid,node.keys.size()).clear();
+        node.children.subList(mid+1,node.children.size()).clear();
+        return new SplitResult(upKey,newNode);
+    }
 }
