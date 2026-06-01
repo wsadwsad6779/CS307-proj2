@@ -39,7 +39,14 @@ public class BPlusTree {
             this.isLeaf = isLeaf;
         }
     }
-
+    static class SplitResult {
+        Value upKey;
+        Node rightNode;
+        SplitResult(Value upKey, Node rightNode) {
+            this.upKey = upKey;//上推的那个 key(父节点要把它插进自己的 keys)
+            this.rightNode = rightNode;//新生的右节点(父节点要把它挂进自己的 children)
+        }
+    }
     private Node root;
 
     public BPlusTree() {
