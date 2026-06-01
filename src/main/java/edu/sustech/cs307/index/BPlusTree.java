@@ -59,6 +59,21 @@ public class BPlusTree {
         // TODO: 你来写
         // 1. cur 从 root 出发，while(!cur.isLeaf) 时用 cmp 选 child 下降
         // 2. 到叶子后扫 keys 找 cmp==0 的，返回对应 values；没有返回 null
+        var cur = root;
+        while (!cur.isLeaf) {
+            int index = 0;
+            while (index < cur.keys.size() && cmp(key, cur.keys.get(index)) >= 0) {//叶子分裂时中间key复制到右边那片叶子
+                index++;
+            }
+            cur = cur.children.get(index);
+        }
+        int index = 0;
+        for (var i : cur.keys) {
+            if (cmp(key, i) == 0) {
+                return cur.values.get(index);
+            }
+            index++;
+        }
         return null;
     }
 
