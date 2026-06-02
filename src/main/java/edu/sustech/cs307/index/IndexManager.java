@@ -15,6 +15,11 @@ public class IndexManager {
     private final Map<String, Map<String, BPlusTree>> tableIndexes = new HashMap<>();
     private final Map<String, String[]> nameToCol = new HashMap<>();
 
+    /** 索引名是否已存在。 */
+    public boolean hasIndex(String indexName) {
+        return nameToCol.containsKey(indexName);
+    }
+
     /** 登记一棵新建好的树。 */
     public void addIndex(String indexName, String table, String column, BPlusTree tree) {
         tableIndexes.computeIfAbsent(table, k -> new HashMap<>()).put(column, tree);

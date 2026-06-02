@@ -36,6 +36,10 @@ class IndexSqlTest {
         run(dbManager, "CREATE INDEX ix ON t (id)");
         run(dbManager, "PRINT INDEX ix");
 
+        // 重复创建同名索引应报错，且程序继续可用
+        org.junit.jupiter.api.Assertions.assertThrows(DBException.class,
+                () -> run(dbManager, "CREATE INDEX ix ON t (id)"));
+
         System.out.println("==== 再 INSERT 9,10（树应动态长大）====");
         run(dbManager, "INSERT INTO t (id) VALUES (9)");
         run(dbManager, "INSERT INTO t (id) VALUES (10)");

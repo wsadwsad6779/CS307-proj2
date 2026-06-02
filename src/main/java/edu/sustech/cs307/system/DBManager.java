@@ -84,6 +84,9 @@ public class DBManager {
      * 1) 校验表/列存在 2) 扫描现有数据建树 3) 登记到 IndexManager 4) 写入 meta JSON。
      */
     public void createIndex(String indexName, String tableName, String columnName) throws DBException {
+        if (indexManager.hasIndex(indexName)) {                      // 重名索引直接报错
+            throw new DBException(ExceptionTypes.IndexAlreadyExist(indexName));
+        }
         TableMeta meta = metaManager.getTable(tableName);            // 表不存在会抛异常
         if (meta.getColumnMeta(columnName) == null) {
             throw new DBException(ExceptionTypes.ColumnDoesNotExist(columnName));

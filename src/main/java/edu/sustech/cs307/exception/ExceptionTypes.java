@@ -24,7 +24,8 @@ public enum ExceptionTypes {
     NOT_SUPPORTED_OPERATION,
     SAVEPOINT_DOES_NOT_EXIST,
     TRANSACTION_REQUIRED,
-    TRANSACTION_ALREADY_ACTIVE
+    TRANSACTION_ALREADY_ACTIVE,
+    INDEX_ALREADY_EXIST
     ;
 
     private String error_result;
@@ -178,6 +179,13 @@ public enum ExceptionTypes {
                 String.format("Transaction already active")
         );
         return TRANSACTION_ALREADY_ACTIVE;
+    }
+
+    static public ExceptionTypes IndexAlreadyExist(String indexName) {
+        INDEX_ALREADY_EXIST.SetErrorResult(
+                String.format("index %s already exists", indexName)
+        );
+        return INDEX_ALREADY_EXIST;
     }
 
 
