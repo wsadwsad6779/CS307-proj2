@@ -57,11 +57,12 @@ public class DeleteOperator implements PhysicalOperator {
 
             if (whereExpr == null || tuple.eval_expr(whereExpr)) {
                 ridsToDelete.add(tuple.getRID());
-                // 索引联动：从每棵树里删掉这一行该列的值
+                // 索引联动：从每棵树里删掉这一行（按 列值 + RID 定位具体行）
+                RID ridToDelete = tuple.getRID();
                 for (Map.Entry<String, BPlusTree> e : indexes.entrySet()) {
                     Value v = tuple.getValue(new TabCol("", e.getKey()));
                     if (v != null) {
-                        e.getValue().delete(v);
+                        e.getValue().delete(v, ridToDelete);
                     }
                 }
             }

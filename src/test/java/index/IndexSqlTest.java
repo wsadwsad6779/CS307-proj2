@@ -6,6 +6,7 @@ import edu.sustech.cs307.meta.MetaManager;
 import edu.sustech.cs307.optimizer.LogicalPlanner;
 import edu.sustech.cs307.optimizer.PhysicalPlanner;
 import edu.sustech.cs307.physicalOperator.PhysicalOperator;
+import edu.sustech.cs307.physicalOperator.IndexScanOperator;
 import edu.sustech.cs307.storage.BufferPool;
 import edu.sustech.cs307.storage.DiskManager;
 import edu.sustech.cs307.storage.replacer.ClockReplacer;
@@ -17,6 +18,8 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.function.IntFunction;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class IndexSqlTest {
 
@@ -54,6 +57,56 @@ class IndexSqlTest {
         System.out.println("==== DROP INDEX ix ====");
         run(dbManager, "DROP INDEX ix");
         run(dbManager, "PRINT INDEX ix");
+    }
+
+    @Test
+    void indexScanReturnsAllMatchingRows() throws DBException {
+        DBManager dbManager = buildDbManager();
+        run(dbManager, "CREATE TABLE p (id int, age int)");
+        // age=19 有 3 行(id=2,7,12)，age=18 有 2 行
+        int[][] rows = {{2, 19}, {7, 19}, {12, 19}, {3, 18}, {5, 18}, {9, 20}};
+        for (int[] r : rows) {
+            run(dbManager, "INSERT INTO p (id, age) VALUES (" + r[0] + ", " + r[1] + ")");
+        }
+        run(dbManager, "CREATE INDEX ix_age ON p (age)");
+
+        // 1) 该查询的物理计划应是 IndexScanOperator（证明走了索引）
+        LogicalOperator logical = LogicalPlanner.resolveAndPlan(dbManager, "select * from p where age = 19");
+        LogicalOperator filter = logical.getChildren().get(0);   // project -> filter
+        PhysicalOperator phys = PhysicalPlanner.generateOperator(dbManager, filter);
+        org.junit.jupiter.api.Assertions.assertTrue(phys instanceof IndexScanOperator,
+                "where age=19 应走 IndexScan，实际是 " + phys.getClass().getSimpleName());
+
+        // 2) 结果正确：返回 id 集合 = {2,7,12}
+        java.util.Set<Long> ids = selectIds(dbManager, "select id from p where age = 19");
+        assertEquals(java.util.Set.of(2L, 7L, 12L), ids);
+
+        // 3) 插入一行 age=19 后，再查应多一行(动态联动)
+        run(dbManager, "INSERT INTO p (id, age) VALUES (37, 19)");
+        assertEquals(java.util.Set.of(2L, 7L, 12L, 37L),
+                selectIds(dbManager, "select id from p where age = 19"));
+
+        // 4) 删除一行后，再查应少一行
+        run(dbManager, "DELETE FROM p WHERE id = 7");
+        assertEquals(java.util.Set.of(2L, 12L, 37L),
+                selectIds(dbManager, "select id from p where age = 19"));
+    }
+
+    /** 跑一条 SELECT，收集第一列(id)的值。 */
+    private java.util.Set<Long> selectIds(DBManager dbManager, String sql) throws DBException {
+        LogicalOperator logical = LogicalPlanner.resolveAndPlan(dbManager, sql);
+        PhysicalOperator op = PhysicalPlanner.generateOperator(dbManager, logical);
+        java.util.Set<Long> ids = new java.util.HashSet<>();
+        op.Begin();
+        while (op.hasNext()) {
+            op.Next();
+            var tuple = op.Current();
+            if (tuple != null) {
+                ids.add((Long) tuple.getValues()[0].value);
+            }
+        }
+        op.Close();
+        return ids;
     }
 
     private DBManager buildDbManager() throws DBException {

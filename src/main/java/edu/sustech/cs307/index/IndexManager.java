@@ -43,6 +43,16 @@ public class IndexManager {
         return tableIndexes.getOrDefault(table, Collections.emptyMap());
     }
 
+    /** 按 表+列 反查索引名（给 EXPLAIN 显示用）。没有返回 null。 */
+    public String getIndexNameByColumn(String table, String column) {
+        for (Map.Entry<String, String[]> e : nameToCol.entrySet()) {
+            if (e.getValue()[0].equals(table) && e.getValue()[1].equals(column)) {
+                return e.getKey();
+            }
+        }
+        return null;
+    }
+
     /** 按索引名取树（给 PRINT INDEX 用）。 */
     public BPlusTree getIndexByName(String indexName) {
         String[] tc = nameToCol.get(indexName);

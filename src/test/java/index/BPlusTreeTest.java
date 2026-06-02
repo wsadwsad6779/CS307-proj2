@@ -7,11 +7,16 @@ import edu.sustech.cs307.value.Value;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.Set;
+import java.util.TreeSet;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BPlusTreeTest {
 
@@ -28,9 +33,9 @@ class BPlusTreeTest {
         }
         assertNull(tree.search(new Value(999L)));
 
-        tree.delete(new Value(3L));
-        tree.delete(new Value(4L));
-        tree.delete(new Value(5L));
+        tree.delete(new Value(3L), new RID(3, 0));
+        tree.delete(new Value(4L), new RID(4, 0));
+        tree.delete(new Value(5L), new RID(5, 0));
         System.out.println("==== 删除 3,4,5（借位/合并）后的 B+ 树 ====");
         tree.printTree();
         assertNull(tree.search(new Value(3L)));
@@ -40,48 +45,61 @@ class BPlusTreeTest {
     }
 
     @Test
-    void deleteAllThenReusable() throws DBException {
+    void nonUniqueKeySupportsMultipleRows() throws DBException {
         BPlusTree tree = new BPlusTree();
-        for (long i = 1; i <= 50; i++) {
-            tree.insert(new Value(i), new RID((int) i, 0));
-        }
-        for (long i = 1; i <= 50; i++) {
-            tree.delete(new Value(i));
-            assertNull(tree.search(new Value(i)));
-        }
-        // 全删空后仍能用
-        tree.insert(new Value(42L), new RID(7, 0));
-        assertEquals(7, tree.search(new Value(42L)).pageNum);
+        // age=19 的 5 行（key 相同，RID 不同）
+        tree.insert(new Value(19L), new RID(2, 0));
+        tree.insert(new Value(19L), new RID(7, 0));
+        tree.insert(new Value(19L), new RID(12, 0));
+        tree.insert(new Value(18L), new RID(99, 0));   // 干扰：另一个 key
+
+        List<RID> rows = tree.searchAll(new Value(19L));
+        assertEquals(3, rows.size(), "age=19 应返回 3 行");
+
+        // 删掉其中一行，其余仍在
+        tree.delete(new Value(19L), new RID(7, 0));
+        assertEquals(2, tree.searchAll(new Value(19L)).size());
+        // 删光后该 key 消失
+        tree.delete(new Value(19L), new RID(2, 0));
+        tree.delete(new Value(19L), new RID(12, 0));
+        assertTrue(tree.searchAll(new Value(19L)).isEmpty());
+        // 别的 key 不受影响
+        assertEquals(1, tree.searchAll(new Value(18L)).size());
     }
 
     @Test
-    void randomizedAgainstHashMap() throws DBException {
+    void randomizedAgainstMultimap() throws DBException {
         BPlusTree tree = new BPlusTree();
-        HashMap<Long, Integer> expected = new HashMap<>();   // key -> pageNum
+        Map<Long, Set<Integer>> model = new HashMap<>();   // key -> {pageNum}
         Random rnd = new Random(307);
+        int pageCounter = 1;
 
         for (int step = 0; step < 5000; step++) {
-            long key = rnd.nextInt(200);
+            long key = rnd.nextInt(40);                     // key 范围小 → 大量重复
             if (rnd.nextBoolean()) {
-                int page = step + 1;
+                int page = pageCounter++;                   // 每次插入 RID 唯一
                 tree.insert(new Value(key), new RID(page, 0));
-                expected.put(key, page);
-            } else {
-                tree.delete(new Value(key));
-                expected.remove(key);
-            }
-            // 每步随机抽查若干 key，B+ 树结果必须和 HashMap 一致
-            for (int q = 0; q < 5; q++) {
-                long probe = rnd.nextInt(200);
-                RID rid = tree.search(new Value(probe));
-                if (expected.containsKey(probe)) {
-                    assertNotNull(rid, "step " + step + " key " + probe + " 应存在");
-                    assertEquals((int) expected.get(probe), rid.pageNum);
-                } else {
-                    assertNull(rid, "step " + step + " key " + probe + " 应已删除");
+                model.computeIfAbsent(key, k -> new HashSet<>()).add(page);
+            } else if (model.containsKey(key)) {
+                // 删掉该 key 的某一个具体 RID
+                Integer page = model.get(key).iterator().next();
+                tree.delete(new Value(key), new RID(page, 0));
+                model.get(key).remove(page);
+                if (model.get(key).isEmpty()) {
+                    model.remove(key);
                 }
             }
+            // 抽查：tree.searchAll 的 RID 集合必须和 model 一致
+            for (int q = 0; q < 4; q++) {
+                long probe = rnd.nextInt(40);
+                Set<Integer> got = new TreeSet<>();
+                for (RID r : tree.searchAll(new Value(probe))) {
+                    got.add(r.pageNum);
+                }
+                Set<Integer> exp = new TreeSet<>(model.getOrDefault(probe, Set.of()));
+                assertEquals(exp, got, "step " + step + " key " + probe + " 的行集合不一致");
+            }
         }
-        System.out.println("==== 5000 步随机插入/删除，与 HashMap 全程一致 ====");
+        System.out.println("==== 5000 步随机(含大量重复 key)，与 multimap 全程一致 ====");
     }
 }

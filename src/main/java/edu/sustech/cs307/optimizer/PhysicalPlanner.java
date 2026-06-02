@@ -7,6 +7,7 @@ import edu.sustech.cs307.physicalOperator.*;
 import edu.sustech.cs307.system.DBManager;
 import edu.sustech.cs307.value.Value;
 import edu.sustech.cs307.value.ValueType;
+import edu.sustech.cs307.index.BPlusTree;
 import edu.sustech.cs307.meta.ColumnMeta;
 import edu.sustech.cs307.meta.TableMeta;
 
@@ -14,6 +15,8 @@ import net.sf.jsqlparser.expression.DoubleValue;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.LongValue;
 import net.sf.jsqlparser.expression.StringValue;
+import net.sf.jsqlparser.expression.operators.relational.EqualsTo;
+import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
 import net.sf.jsqlparser.expression.operators.relational.ParenthesedExpressionList;
 import net.sf.jsqlparser.statement.select.Values;
@@ -69,8 +72,62 @@ public class PhysicalPlanner {
 
     private static PhysicalOperator handleFilter(DBManager dbManager, LogicalFilterOperator logicalFilterOp)
             throws DBException {
+        // 优化器：若是 “被索引列 = 值” 且该列有索引，改走 IndexScan
+        PhysicalOperator indexScan = tryIndexScan(dbManager, logicalFilterOp);
+        if (indexScan != null) {
+            return indexScan;
+        }
         PhysicalOperator inputOp = generateOperator(dbManager, logicalFilterOp.getChild());
         return new FilterOperator(inputOp, logicalFilterOp.getWhereExpr());
+    }
+
+    /**
+     * 尝试把 “WHERE col = value” 的过滤替换成索引扫描。
+     * 条件：子节点是表扫描、条件是单个等值、列上有 B+ 树索引。不满足返回 null。
+     */
+    private static PhysicalOperator tryIndexScan(DBManager dbManager, LogicalFilterOperator op)
+            throws DBException {
+        if (!(op.getChild() instanceof LogicalTableScanOperator scan)) {
+            return null;
+        }
+        if (!(op.getWhereExpr() instanceof EqualsTo eq)) {
+            return null;
+        }
+        Expression left = eq.getLeftExpression();
+        Expression right = eq.getRightExpression();
+        Column col;
+        Expression valExpr;
+        if (left instanceof Column c && !(right instanceof Column)) {
+            col = c; valExpr = right;
+        } else if (right instanceof Column c && !(left instanceof Column)) {
+            col = c; valExpr = left;
+        } else {
+            return null;
+        }
+        String tableName = scan.getTableName();
+        String colName = col.getColumnName();
+        BPlusTree tree = dbManager.getIndexManager().getIndexesForTable(tableName).get(colName);
+        if (tree == null) {
+            return null;   // 该列没有索引
+        }
+        Value key = exprToValue(valExpr);
+        if (key == null) {
+            return null;
+        }
+        return new IndexScanOperator(tableName, tree, key, dbManager);
+    }
+
+    private static Value exprToValue(Expression e) {
+        if (e instanceof LongValue lv) {
+            return new Value(lv.getValue());      // INTEGER
+        }
+        if (e instanceof StringValue sv) {
+            return new Value(sv.getValue());      // CHAR
+        }
+        if (e instanceof DoubleValue dv) {
+            return new Value(dv.getValue());      // FLOAT
+        }
+        return null;
     }
 
     private static PhysicalOperator handleJoin(DBManager dbManager, LogicalJoinOperator logicalJoinOp)

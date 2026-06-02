@@ -34,8 +34,9 @@ public class BPlusTree {
         // 仅内部节点使用：children.size() == keys.size() + 1
         List<Node> children = new ArrayList<>();
 
-        // 仅叶子节点使用：values 与 keys 一一对应
-        List<RID> values = new ArrayList<>();
+        // 仅叶子节点使用：values 与 keys 一一对应。
+        // 非唯一索引：一个 key 可能对应多行，所以每个 key 挂一串 RID。
+        List<List<RID>> values = new ArrayList<>();
         Node next;   // 指向右边相邻的叶子，串成链
 
         Node(boolean isLeaf) {
@@ -81,11 +82,29 @@ public class BPlusTree {
         int index = 0;
         for (var i : cur.keys) {
             if (cmp(key, i) == 0) {
-                return cur.values.get(index);
+                return cur.values.get(index).get(0);   // 该 key 的第一个 RID
             }
             index++;
         }
         return null;
+    }
+
+    /** 查找 key 对应的【所有】RID（非唯一索引：一个值可能对应多行）。找不到返回空列表。 */
+    public List<RID> searchAll(Value key) throws DBException {
+        var cur = root;
+        while (!cur.isLeaf) {
+            int index = 0;
+            while (index < cur.keys.size() && cmp(key, cur.keys.get(index)) >= 0) {
+                index++;
+            }
+            cur = cur.children.get(index);
+        }
+        for (int j = 0; j < cur.keys.size(); j++) {
+            if (cmp(key, cur.keys.get(j)) == 0) {
+                return new ArrayList<>(cur.values.get(j));   // 拷贝一份返回
+            }
+        }
+        return new ArrayList<>();
     }
 
     /** 插入一对 (key, rid)。叶子塞满时分裂，必要时树长高。 */
@@ -100,21 +119,25 @@ public class BPlusTree {
         }
     }
 
-    /** 删除 key。严格版：下溢时向兄弟借或与兄弟合并；根删空则变矮。 */
-    public void delete(Value key) throws DBException {
-        deleteFrom(root, key);
+    /** 删除某一行：从 key 的 RID 列表里移除指定 rid；该 key 没有行后整条删除并修复下溢。 */
+    public void delete(Value key, RID rid) throws DBException {
+        deleteFrom(root, key, rid);
         // 根变矮：根是内部节点且删到没 key、只剩一个孩子 → 那个孩子当新根
         if (!root.isLeaf && root.keys.isEmpty() && root.children.size() == 1) {
             root = root.children.get(0);
         }
     }
 
-    private void deleteFrom(Node node, Value key) throws DBException {
+    private void deleteFrom(Node node, Value key, RID rid) throws DBException {
         if (node.isLeaf) {
             for (int j = 0; j < node.keys.size(); j++) {
                 if (cmp(key, node.keys.get(j)) == 0) {
-                    node.keys.remove(j);
-                    node.values.remove(j);
+                    List<RID> ridList = node.values.get(j);
+                    ridList.removeIf(r -> r.pageNum == rid.pageNum && r.slotNum == rid.slotNum);
+                    if (ridList.isEmpty()) {       // 这个 key 已经没有任何行了，整条删掉
+                        node.keys.remove(j);
+                        node.values.remove(j);
+                    }
                     return;
                 }
             }
@@ -126,7 +149,7 @@ public class BPlusTree {
             idx++;
         }
         Node child = node.children.get(idx);
-        deleteFrom(child, key);
+        deleteFrom(child, key, rid);
         // 递归回来后，若该孩子下溢(key 数 < MIN_KEYS)，修复它
         if (child.keys.size() < MIN_KEYS) {
             fixUnderflow(node, idx);
@@ -226,13 +249,15 @@ public class BPlusTree {
             while (index < node.keys.size() && cmp(key, node.keys.get(index)) >= 0) {
                 index++;
             }
-            // 重复 key：>= 0 的循环会跳过相等的，相同 key 落在 index-1，更新它的 RID
+            // 重复 key：>= 0 的循环会跳过相等的，相同 key 落在 index-1，追加一个 RID（非唯一索引）
             if (index > 0 && cmp(key, node.keys.get(index - 1)) == 0) {
-                node.values.set(index - 1, rid);
-                return null;
+                node.values.get(index - 1).add(rid);
+                return null;   // key 已存在，只是多挂一个 RID，不会改变树结构
             }
             node.keys.add(index, key);
-            node.values.add(index, rid);
+            List<RID> ridList = new ArrayList<>();
+            ridList.add(rid);
+            node.values.add(index, ridList);
             if (node.keys.size() > MAX_KEYS) {
                 return splitLeaf(node);
             }
