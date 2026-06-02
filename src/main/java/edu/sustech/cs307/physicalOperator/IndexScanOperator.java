@@ -38,11 +38,19 @@ public class IndexScanOperator implements PhysicalOperator {
         this.index = index;
         this.key = key;
         this.dbManager = dbManager;
+        // 在构造器里就拿到 tableMeta：DBEntry 会在 Begin() 之前调用 outputSchema()
+        try {
+            this.tableMeta = dbManager.getMetaManager().getTable(tableName);
+        } catch (DBException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
     public void Begin() throws DBException {
-        tableMeta = dbManager.getMetaManager().getTable(tableName);
+        if (tableMeta == null) {
+            tableMeta = dbManager.getMetaManager().getTable(tableName);
+        }
         fileHandle = dbManager.getRecordManager().OpenFile(tableName);
         rids = index.searchAll(key);      // 走索引，一次拿到所有匹配行的位置
         pos = 0;

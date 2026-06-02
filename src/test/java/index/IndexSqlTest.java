@@ -97,6 +97,7 @@ class IndexSqlTest {
         LogicalOperator logical = LogicalPlanner.resolveAndPlan(dbManager, sql);
         PhysicalOperator op = PhysicalPlanner.generateOperator(dbManager, logical);
         java.util.Set<Long> ids = new java.util.HashSet<>();
+        op.outputSchema();   // 模拟 DBEntry：Begin() 之前先取 schema，防止 tableMeta 未初始化
         op.Begin();
         while (op.hasNext()) {
             op.Next();
