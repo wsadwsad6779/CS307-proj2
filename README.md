@@ -1585,67 +1585,49 @@ catalog 持久化成功
 
 ---
 
-## 进阶任务演示脚本（Task 3 索引 / Task 4 事务）
+## 进阶任务演示（Task 3 索引 / Task 4 事务）
 
-> 启动：`mvn exec:java -Dexec.mainClass=edu.sustech.cs307.DBEntry`
-> **一条一条敲，回车等结果再敲下一条**，不要整段粘贴（输入缓冲会把多条命令粘在一起）。
-> `print index` 的输出用 `System.out`，**没有时间戳前缀**，找以 `level0:` 开头的那几行。
+> 启动 `mvn exec:java -Dexec.mainClass=edu.sustech.cs307.DBEntry`；命令逐条敲、回车等结果。
+> `print index` 用 `System.out` 输出，无时间戳，找 `level0:` 开头的行。
 
 ### Task 3：索引（内存 B+ 树）
 
+**建树与打印**
 ```sql
-drop table demo;                       -- 第一次会 warn 不存在，忽略
 create table demo ( id int );
-insert into demo (id) values (1);
-insert into demo (id) values (2);
-insert into demo (id) values (3);
-insert into demo (id) values (4);
-insert into demo (id) values (5);
-insert into demo (id) values (6);
-insert into demo (id) values (7);
-insert into demo (id) values (8);
-create index ix on demo (id);          -- 基于已有数据建树
-print index ix;                        -- 打印整棵 B+ 树（按层）
+insert into demo (id) values (1);   -- 依次插 1..8
+...
+create index ix on demo (id);
+print index ix;
 ```
-期望（2 层树）：
 ```
 level0:I[3, 5, 7]
 level1:L[1, 2] L[3, 4] L[5, 6] L[7, 8]
 ```
 
-继续动态插入，树会长高：
+**动态插入会长高、删除触发借位/合并（无空节点）**
 ```sql
-insert into demo (id) values (9);
-insert into demo (id) values (10);
+insert into demo (id) values (9);   -- 再插 9,10 → 长成 3 层
+delete from demo where id = 3;      -- 删 3,4,5 → 借位/合并，路标更新
 print index ix;
 ```
-```
-level0:I[7]
-level1:I[3, 5] I[9]
-level2:L[1, 2] L[3, 4] L[5, 6] L[7, 8] L[9, 10]
-```
 
-删除会触发借位/合并（删完无空节点，路标自动更新）：
+**非唯一索引 + 走索引查询**
 ```sql
-delete from demo where id = 3;
-delete from demo where id = 4;
-delete from demo where id = 5;
-print index ix;
+create table t ( id int, age int );
+insert into t (id, age) values (2, 19);   -- age=19 多行
+insert into t (id, age) values (7, 19);
+create index idx_age on t (age);
+explain select id from t where age = 19;  -- 计划显示走索引
+select id from t where age = 19;          -- 返回所有 age=19 的行
 ```
 ```
-level0:I[7]
-level1:I[2, 5] I[9]
-level2:L[1] L[2] L[6] L[7, 8] L[9, 10]
-```
-
-删除索引（meta_data.json 同步移除该索引记录）：
-```sql
-drop index ix;
-print index ix;        -- 输出：No such index: ix
+ProjectOperator(...)
+    └── IndexScanOperator(table=t, index=idx_age, condition=age = 19)
 ```
 
-**要点**：`create index xx on t(col)` / `drop index xx` 识别并改 JSON；内存 B+ 树可打印每个节点；
-支持多列多棵树；insert/delete 动态联动更新树（树本身 in-memory，不落盘）。
+**说明**：识别 `create index xx on t(col)` / `drop index xx` 并改 meta JSON；B+ 树在内存、可逐节点打印；
+支持多列多棵树；insert/delete 联动维护；同一 key 可挂多行（非唯一）；`where 列=值` 且有索引时优化器走 `IndexScanOperator`。
 
 ### Task 4：事务（shadow paging + savepoint 栈）
 
@@ -1655,21 +1637,10 @@ begin;
 insert into u (id) values (1);
 savepoint a;
 insert into u (id) values (2);
-savepoint b;
-insert into u (id) values (3);
-rollback to savepoint b;     -- 撤回 id=3，保留 1,2
+rollback to savepoint a;     -- 撤回 id=2，保留 1（a 仍可再用）
 commit;
-select * from u;             -- 期望：1, 2
+select * from u;             -- 1
 ```
 
-整体回滚到 begin 之前：
-```sql
-begin;
-insert into u (id) values (99);
-rollback;                    -- 整体撤回
-select * from u;             -- 99 不存在
-```
-
-savepoint 相关命令：`savepoint <名>`、`rollback to savepoint <名>`（保留该点，可反复回滚）、
-`release savepoint <名>`（删除该点，不恢复数据）、`rollback`（回到 begin 前）、`commit`。
-事务外执行 `savepoint`/`rollback to`/`release` 会报 `TRANSACTION_REQUIRED`；事务中再 `begin` 报 `TRANSACTION_ALREADY_ACTIVE`。
+命令：`savepoint <名>` / `rollback to savepoint <名>`（保留该点）/ `release savepoint <名>`（删点不恢复数据）/ `rollback`（回到 begin 前）/ `commit`。
+事务外用带保存点的命令报 `TRANSACTION_REQUIRED`；事务中再 `begin` 报 `TRANSACTION_ALREADY_ACTIVE`；事务外 `commit`/`rollback` 为空操作。
