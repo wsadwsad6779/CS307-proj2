@@ -19,6 +19,7 @@ import java.util.Objects;
  * - 叶子之间用 next 指针串成链表，方便范围扫描。
  * - 比较大小一律用 ValueComparer.compare(a, b)，因为 Value 没实现 Comparable。
  */
+
 public class BPlusTree {
 
     /** 阶。每个节点最多 ORDER-1 个 key；超了就分裂。用小一点方便演示分裂。 */
@@ -62,8 +63,6 @@ public class BPlusTree {
     private int cmp(Value a, Value b) throws DBException {
         return ValueComparer.compare(a, b);
     }
-
-    // ====== 下面是要逐步实现的核心方法，先留空 ======
 
     /**
      * 查找 key 对应的 RID，找不到返回 null。
@@ -231,12 +230,13 @@ public class BPlusTree {
             for (int i =0 ; i<size ;i++){
                 Node node =queue.poll();
                 List<Object> vals = new ArrayList<>();
+
                 for (Value v : node.keys) vals.add(v.value);
                 sb.append(node.isLeaf ? "L" : "I").append(vals).append(" ");
+
                 if(!node.isLeaf){
                     queue.addAll(node.children);
                 }
-
             }
             System.out.println(sb);
             level++;

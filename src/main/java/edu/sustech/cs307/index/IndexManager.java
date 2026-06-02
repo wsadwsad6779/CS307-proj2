@@ -4,17 +4,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * 索引仓库：管理运行期内存中的所有 B+ 树。
- * - tableIndexes: 表名 -> (列名 -> 该列的 B+ 树)，支持一张表多列索引、多张表多棵树。
- * - nameToCol:    索引名 -> [表名, 列名]，给 DROP INDEX / PRINT INDEX 按名字定位。
- * 树本身只存在内存(PDF 要求 in-memory)，不落盘；meta_data.json 只记录"有这个索引"。
- */
 public class IndexManager {
 
     private final Map<String, Map<String, BPlusTree>> tableIndexes = new HashMap<>();
+    //tableIndexes: 表名 -> (列名 -> 该列的 B+ 树)，支持一张表多列索引、多张表多棵树。
     private final Map<String, String[]> nameToCol = new HashMap<>();
-
+    //nameToCol:    索引名 -> [表名, 列名]，给 DROP INDEX / PRINT INDEX 按名字定位。
     /** 索引名是否已存在。 */
     public boolean hasIndex(String indexName) {
         return nameToCol.containsKey(indexName);
@@ -22,8 +17,8 @@ public class IndexManager {
 
     /** 登记一棵新建好的树。 */
     public void addIndex(String indexName, String table, String column, BPlusTree tree) {
-        tableIndexes.computeIfAbsent(table, k -> new HashMap<>()).put(column, tree);
-        nameToCol.put(indexName, new String[]{table, column});
+        tableIndexes.computeIfAbsent(table, k -> new HashMap<>()).put(column, tree);//记录：这张表的这个列对应这棵树
+        nameToCol.put(indexName, new String[]{table, column});//记录：这个索引名对应哪张表、哪一列。
     }
 
     /** 按索引名移除，返回 [表名, 列名]（不存在返回 null）。 */
