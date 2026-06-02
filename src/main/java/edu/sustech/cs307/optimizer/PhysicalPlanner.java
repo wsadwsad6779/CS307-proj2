@@ -63,13 +63,8 @@ public class PhysicalPlanner {
             return new SeqScanOperator(tableName, dbManager);
         }
 
-        // Check if index exists for the table (for now, assume RBTreeIndex always
-        // exists if index is defined)
-        if (tableMeta.getIndexes() != null && !tableMeta.getIndexes().isEmpty()) {
-            throw new RuntimeException("unimplement");
-        } else {
-            return new SeqScanOperator(tableName, dbManager);
-        }
+        // 即使有索引，查询暂走全表扫描（索引主要用于演示 B+ 树本身）
+        return new SeqScanOperator(tableName, dbManager);
     }
 
     private static PhysicalOperator handleFilter(DBManager dbManager, LogicalFilterOperator logicalFilterOp)

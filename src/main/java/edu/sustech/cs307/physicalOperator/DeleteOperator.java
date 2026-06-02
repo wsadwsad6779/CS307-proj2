@@ -1,7 +1,9 @@
 package edu.sustech.cs307.physicalOperator;
 
 import edu.sustech.cs307.exception.DBException;
+import edu.sustech.cs307.index.BPlusTree;
 import edu.sustech.cs307.meta.ColumnMeta;
+import edu.sustech.cs307.meta.TabCol;
 import edu.sustech.cs307.record.RecordFileHandle;
 import edu.sustech.cs307.record.RID;
 import edu.sustech.cs307.tuple.TableTuple;
@@ -12,6 +14,7 @@ import edu.sustech.cs307.value.ValueType;
 import net.sf.jsqlparser.expression.Expression;
 
 import java.util.ArrayList;
+import java.util.Map;
 
 public class DeleteOperator implements PhysicalOperator {
     private final SeqScanOperator seqScanOperator;
@@ -42,6 +45,10 @@ public class DeleteOperator implements PhysicalOperator {
         seqScanOperator.Begin();
         RecordFileHandle fileHandle = seqScanOperator.getFileHandle();
 
+        // 该表上的索引（列名 -> B+ 树），删行时同步维护
+        Map<String, BPlusTree> indexes =
+                seqScanOperator.getDbManager().getIndexManager().getIndexesForTable(tableName);
+
         // 收集要删除的RID列表（避免在遍历时修改）
         ArrayList<RID> ridsToDelete = new ArrayList<>();
         while (seqScanOperator.hasNext()) {
@@ -50,6 +57,13 @@ public class DeleteOperator implements PhysicalOperator {
 
             if (whereExpr == null || tuple.eval_expr(whereExpr)) {
                 ridsToDelete.add(tuple.getRID());
+                // 索引联动：从每棵树里删掉这一行该列的值
+                for (Map.Entry<String, BPlusTree> e : indexes.entrySet()) {
+                    Value v = tuple.getValue(new TabCol("", e.getKey()));
+                    if (v != null) {
+                        e.getValue().delete(v);
+                    }
+                }
             }
         }
 

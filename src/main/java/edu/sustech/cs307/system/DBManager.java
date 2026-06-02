@@ -2,9 +2,16 @@ package edu.sustech.cs307.system;
 
 import edu.sustech.cs307.exception.DBException;
 import edu.sustech.cs307.exception.ExceptionTypes;
+import edu.sustech.cs307.index.BPlusTree;
+import edu.sustech.cs307.index.IndexManager;
 import edu.sustech.cs307.meta.ColumnMeta;
 import edu.sustech.cs307.meta.MetaManager;
+import edu.sustech.cs307.meta.TabCol;
 import edu.sustech.cs307.meta.TableMeta;
+import edu.sustech.cs307.physicalOperator.SeqScanOperator;
+import edu.sustech.cs307.record.RID;
+import edu.sustech.cs307.tuple.TableTuple;
+import edu.sustech.cs307.value.Value;
 import edu.sustech.cs307.storage.BufferPool;
 import edu.sustech.cs307.storage.DiskManager;
 import edu.sustech.cs307.storage.replacer.ClockReplacer;
@@ -26,6 +33,7 @@ public class DBManager {
     private final RecordManager recordManager;
     private TransactionManager transactionManager;
     private final IntFunction<PageReplacer> replacerFactory;
+    private final IndexManager indexManager = new IndexManager();
 
     public DBManager(DiskManager diskManager, BufferPool bufferPool, RecordManager recordManager,
                      MetaManager metaManager) {
@@ -65,6 +73,52 @@ public class DBManager {
 
     public MetaManager getMetaManager() {
         return metaManager;
+    }
+
+    public IndexManager getIndexManager() {
+        return indexManager;
+    }
+
+    /**
+     * 创建索引：在指定表的指定列上建一棵 B+ 树。
+     * 1) 校验表/列存在 2) 扫描现有数据建树 3) 登记到 IndexManager 4) 写入 meta JSON。
+     */
+    public void createIndex(String indexName, String tableName, String columnName) throws DBException {
+        TableMeta meta = metaManager.getTable(tableName);            // 表不存在会抛异常
+        if (meta.getColumnMeta(columnName) == null) {
+            throw new DBException(ExceptionTypes.ColumnDoesNotExist(columnName));
+        }
+        BPlusTree tree = new BPlusTree();
+        // 扫描表里已有的每一行，把 (列值 -> RID) 灌进树
+        SeqScanOperator scan = new SeqScanOperator(tableName, this);
+        scan.Begin();
+        while (scan.hasNext()) {
+            scan.Next();
+            TableTuple tuple = (TableTuple) scan.Current();
+            Value v = tuple.getValue(new TabCol("", columnName));
+            RID rid = tuple.getRID();
+            if (v != null && rid != null) {
+                tree.insert(v, rid);
+            }
+        }
+        scan.Close();
+        indexManager.addIndex(indexName, tableName, columnName, tree);
+        meta.getIndexes().put(indexName, TableMeta.IndexType.BTREE);   // 改 JSON：记录有这个索引
+        metaManager.saveToJson();
+        Logger.info("Index '{}' created on {}({}).", indexName, tableName, columnName);
+    }
+
+    /** 删除索引：从 IndexManager 移除树，并从 meta JSON 删除记录。 */
+    public void dropIndex(String indexName) throws DBException {
+        String[] tc = indexManager.removeIndex(indexName);
+        if (tc == null) {
+            Logger.warn("Index '{}' does not exist, nothing to drop.", indexName);
+            return;
+        }
+        TableMeta meta = metaManager.getTable(tc[0]);
+        meta.getIndexes().remove(indexName);
+        metaManager.saveToJson();
+        Logger.info("Index '{}' dropped.", indexName);
     }
 
     public boolean isDirExists(String dir) {

@@ -19,6 +19,7 @@ import net.sf.jsqlparser.statement.insert.Insert;
 import net.sf.jsqlparser.statement.delete.Delete;
 import net.sf.jsqlparser.statement.drop.Drop;
 import net.sf.jsqlparser.statement.create.table.CreateTable;
+import net.sf.jsqlparser.statement.create.index.CreateIndex;
 import net.sf.jsqlparser.expression.Function;
 import net.sf.jsqlparser.expression.operators.relational.ExistsExpression;
 import net.sf.jsqlparser.schema.Column;
@@ -43,6 +44,8 @@ public class LogicalPlanner {
             Pattern.compile("(?i)^DESCRIBE\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;?\\s*$");
     private static final Pattern SHOW_TABLES_PATTERN =
             Pattern.compile("(?i)^SHOW\\s+TABLES\\s*;?\\s*$");
+    private static final Pattern PRINT_INDEX_PATTERN =
+            Pattern.compile("(?i)^PRINT\\s+INDEX\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;?\\s*$");
     private static final Pattern SAVEPOINT_PATTERN =
             Pattern.compile("(?i)^SAVEPOINT\\s+([A-Za-z_][A-Za-z0-9_]*)$");
     private static final Pattern ROLLBACK_TO_PATTERN =
@@ -63,6 +66,10 @@ public class LogicalPlanner {
         }
         // 处理 SHOW TABLES 命令
         if (handleShowTablesCommand(dbManager, sql)) {
+            return null;
+        }
+        // 处理 PRINT INDEX 命令（演示打印 B+ 树）
+        if (handlePrintIndexCommand(dbManager, sql)) {
             return null;
         }
         JSqlParser parser = new CCJSqlParserManager();
@@ -91,9 +98,18 @@ public class LogicalPlanner {
             CreateTableExecutor createTable = new CreateTableExecutor(createTableStmt, dbManager, sql);
             createTable.execute();
             return null;
+        } else if (stmt instanceof CreateIndex createIndexStmt) {
+            String indexName = createIndexStmt.getIndex().getName();
+            String tableName = createIndexStmt.getTable().getName();
+            String columnName = createIndexStmt.getIndex().getColumnsNames().get(0);
+            dbManager.createIndex(indexName, tableName, columnName);
+            return null;
         } else if (stmt instanceof Drop dropStmt) {
-            String tableName = dropStmt.getName().getName();
-            dbManager.dropTable(tableName);
+            if ("INDEX".equalsIgnoreCase(dropStmt.getType())) {
+                dbManager.dropIndex(dropStmt.getName().getName());
+            } else {
+                dbManager.dropTable(dropStmt.getName().getName());
+            }
             return null;
         } else if (stmt instanceof ExplainStatement explainStatement) {
             ExplainExecutor explainExecutor = new ExplainExecutor(explainStatement, dbManager);
@@ -312,6 +328,21 @@ public class LogicalPlanner {
         Matcher m = SHOW_TABLES_PATTERN.matcher(sql.trim());
         if (m.matches()) {
             dbManager.showTables();
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean handlePrintIndexCommand(DBManager dbManager, String sql) {
+        Matcher m = PRINT_INDEX_PATTERN.matcher(sql.trim());
+        if (m.matches()) {
+            String indexName = m.group(1);
+            var tree = dbManager.getIndexManager().getIndexByName(indexName);
+            if (tree == null) {
+                System.out.println("No such index: " + indexName);
+            } else {
+                tree.printTree();
+            }
             return true;
         }
         return false;

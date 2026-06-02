@@ -16,6 +16,7 @@ import java.util.ArrayList;
 
 public class InsertOperator implements PhysicalOperator {
     private final String data_file;
+    private final List<String> columnNames;
     private final List<Value> values;
     private final DBManager dbManager;
     private final int columnSize;
@@ -24,6 +25,7 @@ public class InsertOperator implements PhysicalOperator {
 
     public InsertOperator(String data_file, List<String> columnNames, List<Value> values, DBManager dbManager) {
         this.data_file = data_file;
+        this.columnNames = columnNames;
         this.values = values;
         this.dbManager = dbManager;
         this.columnSize = columnNames.size();
@@ -61,8 +63,17 @@ public class InsertOperator implements PhysicalOperator {
                     buffer.writeBytes(v.ToByte());
                 }
                 if ((columnSize == 1) || ((i + 1) % columnSize == 0 && i != 0)) {
-                    fileHandle.InsertRecord(buffer);
+                    edu.sustech.cs307.record.RID rid = fileHandle.InsertRecord(buffer);
                     buffer.clear();
+                    // 索引联动：把这一行的(索引列值 -> RID)插进对应的 B+ 树
+                    int rowStart = i - columnSize + 1;
+                    var indexes = dbManager.getIndexManager().getIndexesForTable(data_file);
+                    for (var entry : indexes.entrySet()) {
+                        int p = columnNames.indexOf(entry.getKey());   // 索引列在本行的位置
+                        if (p >= 0) {
+                            entry.getValue().insert(values.get(rowStart + p), rid);
+                        }
+                    }
                 }
             }
             this.rowCount = values.size() / columnSize;
