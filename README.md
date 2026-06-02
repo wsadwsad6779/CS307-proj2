@@ -1340,7 +1340,7 @@ drop index idx_age;
 ### 预期输出
 
 ```text
-ERROR: index idx_age does not exist
+WARNING: Index 'idx_age' does not exist, nothing to drop.
 程序继续运行。
 ```
 

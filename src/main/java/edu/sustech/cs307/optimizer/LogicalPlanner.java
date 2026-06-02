@@ -20,6 +20,7 @@ import net.sf.jsqlparser.statement.delete.Delete;
 import net.sf.jsqlparser.statement.drop.Drop;
 import net.sf.jsqlparser.statement.create.table.CreateTable;
 import net.sf.jsqlparser.statement.create.index.CreateIndex;
+import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.Function;
 import net.sf.jsqlparser.expression.operators.relational.ExistsExpression;
 import net.sf.jsqlparser.schema.Column;
@@ -160,6 +161,7 @@ public class LogicalPlanner {
             } else if (unwrapped instanceof ExistsExpression existsExpr) {
                 root = handleExists(dbManager, root, existsExpr);
             } else {
+                validateWhereColumns(dbManager, plainSelect, whereExpr);
                 root = new LogicalFilterOperator(root, whereExpr);
             }
         }
@@ -221,6 +223,42 @@ public class LogicalPlanner {
      * 验证 SELECT 投影列在表中是否存在。
      * 支持多表 JOIN 验证和聚合函数跳过。
      */
+    /**
+     * 校验 WHERE 里引用的列是否存在。只处理单表、非 EXISTS 的简单情况，
+     * 多表 JOIN 直接跳过（避免误判）。不存在则单次抛 COLUMN_DOES_NOT_EXIST。
+     */
+    private static void validateWhereColumns(DBManager dbManager, PlainSelect plainSelect, Expression where)
+            throws DBException {
+        if (plainSelect.getJoins() != null && !plainSelect.getJoins().isEmpty()) {
+            return;   // 多表场景跳过
+        }
+        String table = plainSelect.getFromItem().toString();
+        var meta = dbManager.getMetaManager().getTable(table);
+        List<Column> cols = new ArrayList<>();
+        collectColumns(where, cols);
+        for (Column col : cols) {
+            String colTable = col.getTableName();
+            if (colTable != null && !colTable.isEmpty() && !colTable.equals(table)) {
+                continue;   // 带别的表前缀，跳过
+            }
+            if (meta.getColumnMeta(col.getColumnName()) == null) {
+                throw new DBException(ExceptionTypes.ColumnDoesNotExist(col.getColumnName()));
+            }
+        }
+    }
+
+    /** 从表达式里递归收集列引用（只认列、二元/逻辑运算、括号；子查询等忽略）。 */
+    private static void collectColumns(Expression expr, List<Column> out) {
+        if (expr instanceof Column c) {
+            out.add(c);
+        } else if (expr instanceof net.sf.jsqlparser.expression.BinaryExpression be) {
+            collectColumns(be.getLeftExpression(), out);
+            collectColumns(be.getRightExpression(), out);
+        } else if (expr instanceof net.sf.jsqlparser.expression.Parenthesis p) {
+            collectColumns(p.getExpression(), out);
+        }
+    }
+
     private static void validateProjectColumns(DBManager dbManager, PlainSelect plainSelect) throws DBException {
         // 收集所有涉及的表名
         java.util.Set<String> tableNames = new java.util.LinkedHashSet<>();

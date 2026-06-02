@@ -77,13 +77,11 @@ public class AlterTableExecutor implements DMLExecutor {
                     }
                     ColumnMeta newCol = new ColumnMeta(tableName, colName, vt, newColSize, maxOffset);
                     newCol.displayType = colTypeLower;
-                    dbManager.addColumn(tableName, newCol);
-                    Logger.info("Column '{}' added to table '{}'.", colName, tableName);
+                    dbManager.addColumn(tableName, newCol);   // addColumn 内部已打日志
                 }
                 case "DROP" -> {
                     String colName = exp.getColumnName();
-                    dbManager.dropColumn(tableName, colName);
-                    Logger.info("Column '{}' dropped from table '{}'.", colName, tableName);
+                    dbManager.dropColumn(tableName, colName);  // dropColumn 内部已打日志
                 }
                 default -> throw new DBException(
                     ExceptionTypes.UnsupportedCommand("ALTER TABLE " + opType));
