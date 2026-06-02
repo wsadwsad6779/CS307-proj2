@@ -7,6 +7,7 @@
 
 4.如果出现错误，请检查指令是否正确，然后重新输入
 
+mvn exec:java -Dexec.mainClass=edu.sustech.cs307.DBEntry
 # 一、基础必测流程 SQL
 
 ## 0. 环境检查与异常检查
